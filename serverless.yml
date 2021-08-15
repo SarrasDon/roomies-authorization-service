@@ -1,0 +1,28 @@
+service: roomies-authorization-service
+
+plugins:
+  - serverless-bundle
+  - serverless-pseudo-parameters
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  memorySize: 512
+  stage: ${opt:stage, 'dev'}
+  region: eu-central-1
+  lambdaHashingVersion: 20201221
+
+functions:
+  refresh:
+    handler: src/handlers/refresh.handler
+    events:
+      - http:
+          method: POST
+          path: /refresh
+
+  login:
+    handler: src/handlers/login.handler
+    events:
+      - http:
+          method: POST
+          path: /login
