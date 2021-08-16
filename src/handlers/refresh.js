@@ -1,8 +1,12 @@
-import { compare } from 'bcryptjs';
-import createHttpError from 'http-errors';
-import { ObjectId } from 'mongoDb';
-import { createRefreshTokenCookie, createSignedToken, hashToken } from '../handlers-helpers';
-import { commonMiddleware } from '../middlewares';
+import { compare } from "bcryptjs";
+import createHttpError from "http-errors";
+import { ObjectId } from "mongoDb";
+import {
+  createRefreshTokenCookie,
+  createSignedToken,
+  hashToken,
+} from "../handlers-helpers";
+import { commonMiddleware } from "../middlewares";
 
 async function refresh(event, context) {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -12,10 +16,17 @@ async function refresh(event, context) {
   const { domainName } = requestContext;
   const { cookie } = headers;
 
-  const refreshToken = cookie && cookie.replace(/^refreshToken=/, '');
+  const tokens = cookie ? cookie.split("refreshToken=") : [];
+  for (let token of tokens) {
+    if (token.endsWith(";")) {
+      token = token.slice(0, -1);
+    }
+  }
+
+  const refreshToken = tokens.slice(-1)[0];
 
   if (!user || !refreshToken) {
-    throw new createHttpError.Unauthorized('No user or token found');
+    throw new createHttpError.Unauthorized("No user or token found");
   }
 
   const { email, _id } = user;
@@ -23,16 +34,18 @@ async function refresh(event, context) {
 
   let tokenDb = null;
   try {
-    tokenDb = await db.collection('refreshtokens').findOne({
-      person: ObjectId(_id)
+    tokenDb = await db.collection("refreshtokens").findOne({
+      person: ObjectId(_id),
     });
   } catch (error) {
     console.error(error);
-    throw new createHttpError.InternalServerError('Error while getting refresh token of user!');
+    throw new createHttpError.InternalServerError(
+      "Error while getting refresh token of user!"
+    );
   }
 
   if (!tokenDb || !tokenDb.token) {
-    throw new createHttpError.Unauthorized('No tokenDb or tokenDb.token!');
+    throw new createHttpError.Unauthorized("No tokenDb or tokenDb.token!");
   }
 
   let result = null;
@@ -40,11 +53,11 @@ async function refresh(event, context) {
     result = await compare(refreshToken, tokenDb.token.toString());
   } catch (error) {
     console.error(error);
-    throw new createHttpError.InternalServerError('Comparison error!');
+    throw new createHttpError.InternalServerError("Comparison error!");
   }
 
   if (!result) {
-    throw new createHttpError.Unauthorized('Tokens dont match');
+    throw new createHttpError.Unauthorized("Tokens dont match");
   }
 
   const access_token = createSignedToken(email, _id);
@@ -53,14 +66,18 @@ async function refresh(event, context) {
   const hashed = await hashToken(refresh_token);
 
   try {
-    await db.collection('refreshtokens').updateOne(
-      { person: ObjectId(_id) },
-      { $set: { token: hashed, person: ObjectId(_id) } },
-      { new: true, upsert: true }
-    );
+    await db
+      .collection("refreshtokens")
+      .updateOne(
+        { person: ObjectId(_id) },
+        { $set: { token: hashed, person: ObjectId(_id) } },
+        { new: true, upsert: true }
+      );
   } catch (error) {
     console.error(error);
-    throw new createHttpError.InternalServerError('Error while updating token of user!');
+    throw new createHttpError.InternalServerError(
+      "Error while updating token of user!"
+    );
   }
 
   const cookieString = createRefreshTokenCookie(refresh_token, domainName);

@@ -1,8 +1,12 @@
-import { compare } from 'bcryptjs';
-import createHttpError from 'http-errors';
-import { ObjectId } from 'mongoDb';
-import { createRefreshTokenCookie, createSignedToken, hashToken } from '../handlers-helpers';
-import { commonMiddleware } from '../middlewares';
+import { compare } from "bcryptjs";
+import createHttpError from "http-errors";
+import { ObjectId } from "mongoDb";
+import {
+  createRefreshTokenCookie,
+  createSignedToken,
+  hashToken,
+} from "../handlers-helpers";
+import { commonMiddleware } from "../middlewares";
 
 async function login(event, context) {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -12,26 +16,26 @@ async function login(event, context) {
   const { domainName } = requestContext;
 
   if (!email) {
-    throw new createHttpError.BadRequest('No email provided!');
+    throw new createHttpError.BadRequest("No email provided!");
   }
 
   if (!password) {
-    throw new createHttpError.BadRequest('No password provided!');
+    throw new createHttpError.BadRequest("No password provided!");
   }
 
   const { db } = context;
 
   let user = null;
   try {
-    user = await db.collection('users').findOne({ email });
+    user = await db.collection("users").findOne({ email });
   } catch (error) {
     console.error(error);
-    throw new createHttpError[500]('Error while getting user!');
+    throw new createHttpError[500]("Error while getting user!");
   }
 
   if (!user || !user.password) {
-    console.error('No such user!', email, password);
-    throw new createHttpError.Unauthorized('No such user!');
+    console.error("No such user!", email, password);
+    throw new createHttpError.Unauthorized("No such user!");
   }
 
   let result = null;
@@ -39,11 +43,11 @@ async function login(event, context) {
     result = await compare(password, user.password.toString());
   } catch (error) {
     console.error(error);
-    throw new createHttpError.InternalServerError('Compare failed!');
+    throw new createHttpError.InternalServerError("Compare failed!");
   }
 
   if (!result) {
-    throw new createHttpError.Unauthorized('No user for that password!');
+    throw new createHttpError.Unauthorized("No user for that password!");
   }
 
   const { _id } = user;
@@ -51,16 +55,19 @@ async function login(event, context) {
   const refresh_token = createSignedToken(user, _id, 7 * 24 * 60 * 60);
 
   const hashed = await hashToken(refresh_token);
-
   try {
-    await db.collection('refreshtokens').updateOne(
-      { person: ObjectId(_id) },
-      { $set: { token: hashed, person: ObjectId(_id) } },
-      { new: true, upsert: true }
-    );
+    await db
+      .collection("refreshtokens")
+      .updateOne(
+        { person: ObjectId(_id) },
+        { $set: { token: hashed, person: ObjectId(_id) } },
+        { new: true, upsert: true }
+      );
   } catch (error) {
     console.error(error);
-    throw new createHttpError.InternalServerError('Error while updating token of user!');
+    throw new createHttpError.InternalServerError(
+      "Error while updating token of user!"
+    );
   }
 
   const cookieString = createRefreshTokenCookie(refresh_token, domainName);
